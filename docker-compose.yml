@@ -1,0 +1,93 @@
+services:
+  # API Service (NestJS)
+  api:
+    build:
+      context: ./api-users-crud
+    container_name: api-users-crud
+    command: sh /app/entrypoint.sh
+    volumes:
+      - ./api-users-crud:/app
+      - /app/node_modules
+    working_dir: /app
+    ports:
+      - "8000:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - dev
+
+  # Web Service (Next.js)
+  web:
+    build:
+      context: ./web-users-crud
+    container_name: web-users-crud
+    command: yarn dev
+    volumes:
+      - ./web-users-crud:/app
+      - /app/node_modules
+    working_dir: /app
+    ports:
+      - "3000:3000"
+    depends_on:
+      - api
+    networks:
+      - dev
+
+  # Database for development
+  postgres:
+    container_name: postgres-mouts-crud-development
+    image: postgres
+    healthcheck:
+      test: ["CMD", "pg_isready", "-q", "-d", "postgres", "-U", "postgres"]
+      timeout: 45s
+      interval: 10s
+      retries: 10
+    restart: always
+    env_file: ./api-users-crud/.env.development
+    volumes:
+      - crud-development:/var/lib/postgresql/data
+    networks:
+      - dev
+
+  # Database for test
+  postgres-test:
+    container_name: postgres-mouts-crud-test
+    image: postgres
+    restart: always
+    env_file: ./api-users-crud/.env.test
+    volumes:
+      - crud-test:/var/lib/postgresql/data
+    networks:
+      - dev
+
+  # Redis for development
+  redis:
+    container_name: redis-mouts-crud-development
+    image: redis
+    restart: always
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - dev
+
+  # Redis for test
+  redis-test:
+    container_name: redis-mouts-crud-test
+    image: redis
+    restart: always
+    networks:
+      - dev
+
+volumes:
+  crud-development:
+  crud-test:
+
+networks:
+  dev:
+    driver: bridge
